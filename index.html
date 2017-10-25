@@ -29,11 +29,8 @@ function parseGIF(buffer) {
 	const width = res[6] | res[7] << 8;
 	const height = res[8] | res[9] << 8;
 	const has_global_color_table = res[10] & 0b10000000;
-	const color_resolution = ((res[10] & 0b01110000) >> 4) + 1;
-	const sort_flag = res[10] & 0b00001000;
 	const global_color_table_size = 1 << ((res[10] & 0b00000111) + 1);
 	const background_color_index = res[11];
-	const pixel_aspect_ratio = res[12];
 	const GCT_byte_size = has_global_color_table && global_color_table_size * 3;
 	const GCT = res.subarray(13, 13 + GCT_byte_size);
 	i = 13 + GCT_byte_size;
@@ -46,7 +43,6 @@ function parseGIF(buffer) {
 			const image_height = res[i+7] | res[i+8] << 8;
 			const has_local_color_table = res[i+9] & 0b10000000;
 			const interlace_flag = res[i+9] & 0b01000000;
-			const sort_flag = res[i+9] & 0b00100000;
 			const local_color_table_size = 1 << ((res[i+9] & 0b00000111) + 1);
 			i += 10;
 			const LCT_byte_size = has_local_color_table && local_color_table_size * 3;
