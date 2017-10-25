@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Gif Tool</title>
+<style>
+#error:not(:empty) { font: bold larger; color: red; border: 3px solid red; }
+input[type=range], input[type=number] { margin: 0 auto }
+</style>
+<input type=file accept=".gif,image/gif">
+<div id="error"></div>
+<canvas hidden></canvas>
+<img>
+<div id="index-selector" hidden>
+<input type=range min="0" value="0">
+<input type=number min="0" value="0">
+</div>
+<script>
+function parseGIF(buffer) {
+	const images = [];
+	const res = new Uint8ClampedArray(buffer);
+	let context = '', i;
+	document.querySelector('#error').textContent = '';
+	const error = (s='error: unrecognized format.') => {
+		document.querySelector('#error').textContent = s;
+		if (i) document.querySelector('#error').textContent += ` position: ${i}`;
+		if (context) document.querySelector('#error').textContent += ` context: ${context}`;
+	};
+	if (! ['GIF87a','GIF89a'].includes(String.fromCodePoint(...res.subarray(0,6)))) return error();
+	const width = res[6] | res[7] << 8;
+	const height = res[8] | res[9] << 8;
+	const has_global_color_table = res[10] & 0b10000000;
+	const color_resolution = ((res[10] & 0b01110000) >> 4) + 1;
+	const sort_flag = res[10] & 0b00001000;
+	const global_color_table_size = 1 << ((res[10] & 0b00000111) + 1);
+	const background_color_index = res[11];
+	const pixel_aspect_ratio = res[12];
+	const GCT_byte_size = has_global_color_table && global_color_table_size * 3;
+	const GCT = res.subarray(13, 13 + GCT_byte_size);
+	i = 13 + GCT_byte_size;
+	let disposal_method, user_input_flag, transparency_flag, delay_time, transparent_color_index;
+	while (true) {
+		if (res[i] === 0x2C) {
+			const image_left_position = res[i+1] | res[i+2] << 8;
+			const image_top_position = res[i+3] | res[i+4] << 8;
+			const image_width = res[i+5] | res[i+6] << 8;
+			const image_height = res[i+7] | res[i+8] << 8;
+			const has_local_color_table = res[i+9] & 0b10000000;
+			const interlace_flag = res[i+9] & 0b01000000;
+			const sort_flag = res[i+9] & 0b00100000;
+			const local_color_table_size = 1 << ((res[i+9] & 0b00000111) + 1);
+			i += 10;
+			const LCT_byte_size = has_local_color_table && local_color_table_size * 3;
+			const color_table = has_local_color_table ? res.subarray(i, i + LCT_byte_size) : GCT;
+			i += LCT_byte_size;
+			const LZW_minimum_code_size = res[i];
+			i += 1;
+			let size = 0;
+			for (let j = i; res[j] && res[j] !== 0x00; j += 1 + res[j])
+				size += res[j];
+			const data = new Uint8ClampedArray(size);
+			for (let n = 0; res[i] && res[i] !== 0x00; n += res[i], i += 1 + res[i])
+				data.set(res.subarray(i+1, i+1+res[i]), n);
+			let LZW_code_size = LZW_minimum_code_size + 1;
+			const clear_code = 1 << LZW_minimum_code_size;
+			const clip = new Uint8ClampedArray(image_width * image_height);
+			let clip_index = 0;
+			let bit_index = 0;
+			let table = new Array(clear_code + 2);
+			for (let j = 0; j < clear_code; ++j)
+				table[j] = [j];
+			let last_value;
+			while (true) {
+				let byte_index = bit_index >> 3;
+				if (byte_index > data.length) return error();
+				let bytes = data[byte_index] | data[byte_index + 1] << 8 | data[byte_index + 2] << 16;
+				let value = (bytes >> (bit_index & 7)) & ((1 << LZW_code_size) - 1);
+				bit_index += LZW_code_size;
+				if (value === clear_code) {
+					table = new Array(clear_code + 2);
+					for (let j = 0; j < clear_code; ++j)
+						table[j] = [j];
+					LZW_code_size = LZW_minimum_code_size + 1;
+				} else if (value === clear_code + 1)
+					break;
+				else if (value <= table.length) {
+					if (last_value !== clear_code) {
+						const val = table[value === table.length ? last_value : value][0];
+						table.push(table[last_value].concat(val));
+					}
+					clip.set(table[value], clip_index);
+					clip_index += table[value].length;
+				} else return error();
+				if ((table.length === (1 << LZW_code_size)) && LZW_code_size < 12)
+					++LZW_code_size;
+				last_value = value;
+			}
+			const image = new Uint8ClampedArray(width * height * 4);
+			let row = image_top_position;
+			let col = image_left_position;
+			for (let i = 0; i < clip.length; ++i) {
+				if (! transparency_flag || clip[i] !== transparent_color_index) {
+					const pos = (row*width+col)*4;
+					image[pos] = color_table[clip[i]*3];
+					image[pos+1] = color_table[clip[i]*3+1];
+					image[pos+2] = color_table[clip[i]*3+2];
+					image[pos+3] = 0xFF;
+				}
+				++col;
+				if (col - image_left_position >= image_width) {
+					col = image_left_position;
+					++row;
+				}
+			}
+			images.push(new ImageData(image, width, height));
+		} else if (res[i] === 0x21) {
+			if (res[i+1] === 0xF9) {
+				context = 'Graphic Control Extension';
+				i += 2;
+				if (res[i] !== 4) return error();
+				disposal_method = res[i+1] & 0b00011100;
+				user_input_flag = res[i+1] & 0b00000010;
+				transparency_flag = res[i+1] & 0b00000001;
+				delay_time = res[i+2] | res[i+3] << 8;
+				transparent_color_index = res[i+4];
+				i += 1 + res[i];
+			} else if (res[i+1] === 0xFE) {
+				context = 'Comment Extension';
+				i += 2;
+				while (res[i] && res[i] !== 0x00)
+					i += 1 + res[i];
+			} else if (res[i+1] === 0x01) {
+				context = 'Plain Text Extension';
+				i += 2;
+				if (res[i] !== 12) return error();
+				i += 1 + res[i];
+				while (res[i] && res[i] !== 0x00)
+					i += 1 + res[i];
+			} else if (res[i+1] === 0xFF) {
+				context = 'Application Extension';
+				i += 2;
+				if (res[i] !== 11) return error();
+				i += 1 + res[i];
+				while (res[i] && res[i] !== 0x00)
+					i += 1 + res[i];
+			} else return error();
+			context = '';
+		} else if (res[i] === 0x3B)
+			break;
+		else if (res[i] == null)
+			return error('error: unrecognized format. File may be incomplete.');
+		i += 1;
+	}
+	return images;
+}
+let images = [];
+let canvas = document.querySelector('canvas');
+function changeImage({value}) {
+	document.querySelector('input[type=range]').value = value;
+	document.querySelector('input[type=number]').value = value;
+	createImageBitmap(images[value]).then((i) => {
+		canvas.getContext('bitmaprenderer').transferFromImageBitmap(i);
+		document.querySelector('img').src = canvas.toDataURL();
+	});
+}
+document.querySelector('input[type=file]').addEventListener('change', (e) => {
+	let reader = new FileReader();
+	reader.readAsArrayBuffer(e.target.files[0]);
+	reader.addEventListener('loadend', () => {
+		images = parseGIF(reader.result);
+		document.querySelector('#index-selector').hidden = false;
+		canvas.width = images[0].width;
+		canvas.height = images[0].height;
+		changeImage({value: 0});
+		for (let input of document.querySelectorAll('#index-selector input')) {
+			input.max = images.length - 1;
+			input.addEventListener('input', (e) => changeImage(e.target));
+		}
+	});
+});
+</script>
