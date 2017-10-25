@@ -122,28 +122,24 @@ function parseGIF(buffer) {
 			} else if (res[i+1] === 0xFE) {
 				context = 'Comment Extension';
 				i += 2;
-				while (res[i] && res[i] !== 0x00)
-					i += 1 + res[i];
+				while (res[i] && res[i] !== 0x00) i += 1 + res[i];
 			} else if (res[i+1] === 0x01) {
 				context = 'Plain Text Extension';
 				i += 2;
 				if (res[i] !== 12) return error();
-				i += 1 + res[i];
-				while (res[i] && res[i] !== 0x00)
-					i += 1 + res[i];
+				while (res[i] && res[i] !== 0x00) i += 1 + res[i];
 			} else if (res[i+1] === 0xFF) {
 				context = 'Application Extension';
 				i += 2;
 				if (res[i] !== 11) return error();
-				i += 1 + res[i];
-				while (res[i] && res[i] !== 0x00)
-					i += 1 + res[i];
+				while (res[i] && res[i] !== 0x00) i += 1 + res[i];
 			} else return error();
 			context = '';
 		} else if (res[i] === 0x3B)
 			break;
 		else if (res[i] == null)
 			return error('error: unrecognized format. File may be incomplete.');
+		else return error();
 		i += 1;
 	}
 	return images;
