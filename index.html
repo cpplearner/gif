@@ -3,16 +3,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Gif Tool</title>
 <style>
-#error:not(:empty) { font: bold larger; color: red; border: 3px solid red; }
+#error:not(:empty) { font: bold larger; color: red; border: 3px solid red }
+img { max-width:100%; max-height:500px }
 input[type=range], input[type=number] { margin: 0 auto }
+input[type=number] { width: 7ch }
 </style>
 <input type=file accept=".gif,image/gif">
 <div id="error"></div>
 <canvas hidden></canvas>
-<img>
+<output></output>
 <div id="index-selector" hidden>
-<input type=range min="0" value="0">
-<input type=number min="0" value="0">
+<input type=range min=0 value=0>
+<input type=number min=0 value=0>
 </div>
 <script>
 function parseGIF(buffer) {
@@ -34,7 +36,7 @@ function parseGIF(buffer) {
 	const GCT_byte_size = has_global_color_table && global_color_table_size * 3;
 	const GCT = res.subarray(13, 13 + GCT_byte_size);
 	i = 13 + GCT_byte_size;
-	let disposal_method, user_input_flag, transparency_flag, delay_time, transparent_color_index;
+	let transparency_flag, transparent_color_index;
 	while (true) {
 		if (res[i] === 0x2C) {
 			const image_left_position = res[i+1] | res[i+2] << 8;
@@ -91,6 +93,8 @@ function parseGIF(buffer) {
 				last_value = value;
 			}
 			const image = new Uint8ClampedArray(width * height * 4);
+			if (images[images.length - 1])
+				image.set(images[images.length - 1].data);
 			let row = image_top_position;
 			let col = image_left_position;
 			for (let i = 0; i < clip.length; ++i) {
@@ -113,10 +117,7 @@ function parseGIF(buffer) {
 				context = 'Graphic Control Extension';
 				i += 2;
 				if (res[i] !== 4) return error();
-				disposal_method = res[i+1] & 0b00011100;
-				user_input_flag = res[i+1] & 0b00000010;
 				transparency_flag = res[i+1] & 0b00000001;
-				delay_time = res[i+2] | res[i+3] << 8;
 				transparent_color_index = res[i+4];
 				i += 1 + res[i];
 			} else if (res[i+1] === 0xFE) {
@@ -149,10 +150,8 @@ let canvas = document.querySelector('canvas');
 function changeImage({value}) {
 	document.querySelector('input[type=range]').value = value;
 	document.querySelector('input[type=number]').value = value;
-	createImageBitmap(images[value]).then((i) => {
-		canvas.getContext('bitmaprenderer').transferFromImageBitmap(i);
-		document.querySelector('img').src = canvas.toDataURL();
-	});
+	[...document.querySelector('output').children].forEach((i) => i.hidden = true);
+	document.querySelector('output').children[value].hidden = false;
 }
 document.querySelector('input[type=file]').addEventListener('change', (e) => {
 	let reader = new FileReader();
@@ -162,6 +161,15 @@ document.querySelector('input[type=file]').addEventListener('change', (e) => {
 		document.querySelector('#index-selector').hidden = false;
 		canvas.width = images[0].width;
 		canvas.height = images[0].height;
+		document.querySelector('output').textContent = '';
+		for (let image of images) {
+			let img = document.createElement('img');
+			document.querySelector('output').appendChild(img);
+			createImageBitmap(image).then((i) => {
+				canvas.getContext('bitmaprenderer').transferFromImageBitmap(i);
+				img.src = canvas.toDataURL();
+			});
+		}
 		changeImage({value: 0});
 		for (let input of document.querySelectorAll('#index-selector input')) {
 			input.max = images.length - 1;
