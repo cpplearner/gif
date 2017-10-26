@@ -165,10 +165,8 @@ document.querySelector('input[type=file]').addEventListener('change', (e) => {
 		for (let image of images) {
 			let img = document.createElement('img');
 			document.querySelector('output').appendChild(img);
-			createImageBitmap(image).then((i) => {
-				canvas.getContext('bitmaprenderer').transferFromImageBitmap(i);
-				img.src = canvas.toDataURL();
-			});
+			canvas.getContext('2d').putImageData(image, 0, 0);
+			img.src = canvas.toDataURL();
 		}
 		changeImage({value: 0});
 		for (let input of document.querySelectorAll('#index-selector input')) {
