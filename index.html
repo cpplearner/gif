@@ -9,9 +9,10 @@ input[type=range], input[type=number] { margin: 0 auto }
 input[type=number] { width: 7ch }
 </style>
 <input type=file accept=".gif,image/gif">
+<progress hidden></progress>
 <div id="error"></div>
 <canvas hidden></canvas>
-<output></output>
+<output><img></output>
 <div id="index-selector" hidden>
 <input type=range min=0 value=0>
 <input type=number min=0 value=0>
@@ -53,10 +54,10 @@ function parseGIF(buffer) {
 			const LZW_minimum_code_size = res[i];
 			i += 1;
 			let size = 0;
-			for (let j = i; res[j] && res[j] !== 0x00; j += 1 + res[j])
+			for (let j = i; res[j]; j += 1 + res[j])
 				size += res[j];
 			const data = new Uint8ClampedArray(size);
-			for (let n = 0; res[i] && res[i] !== 0x00; n += res[i], i += 1 + res[i])
+			for (let n = 0; res[i]; n += res[i], i += 1 + res[i])
 				data.set(res.subarray(i+1, i+1+res[i]), n);
 			let LZW_code_size = LZW_minimum_code_size + 1;
 			const clear_code = 1 << LZW_minimum_code_size;
@@ -113,6 +114,7 @@ function parseGIF(buffer) {
 			}
 			images.push(new ImageData(image, width, height));
 		} else if (res[i] === 0x21) {
+			context = 'Extension Block';
 			if (res[i+1] === 0xF9) {
 				context = 'Graphic Control Extension';
 				i += 2;
@@ -120,21 +122,10 @@ function parseGIF(buffer) {
 				transparency_flag = res[i+1] & 0b00000001;
 				transparent_color_index = res[i+4];
 				i += 1 + res[i];
-			} else if (res[i+1] === 0xFE) {
-				context = 'Comment Extension';
+			} else {
 				i += 2;
-				while (res[i] && res[i] !== 0x00) i += 1 + res[i];
-			} else if (res[i+1] === 0x01) {
-				context = 'Plain Text Extension';
-				i += 2;
-				if (res[i] !== 12) return error();
-				while (res[i] && res[i] !== 0x00) i += 1 + res[i];
-			} else if (res[i+1] === 0xFF) {
-				context = 'Application Extension';
-				i += 2;
-				if (res[i] !== 11) return error();
-				while (res[i] && res[i] !== 0x00) i += 1 + res[i];
-			} else return error();
+				while (res[i]) i += 1 + res[i];
+			}
 			context = '';
 		} else if (res[i] === 0x3B)
 			break;
@@ -147,13 +138,14 @@ function parseGIF(buffer) {
 }
 let images = [];
 let canvas = document.querySelector('canvas');
-function changeImage({value}) {
+function changeImage(value) {
 	document.querySelector('input[type=range]').value = value;
 	document.querySelector('input[type=number]').value = value;
-	[...document.querySelector('output').children].forEach((i) => i.hidden = true);
-	document.querySelector('output').children[value].hidden = false;
+	canvas.getContext('2d').putImageData(images[value], 0, 0);
+	document.querySelector('output img').src = canvas.toDataURL();
 }
 document.querySelector('input[type=file]').addEventListener('change', (e) => {
+	document.querySelector('progress').hidden = false;
 	let reader = new FileReader();
 	reader.readAsArrayBuffer(e.target.files[0]);
 	reader.addEventListener('loadend', () => {
@@ -161,18 +153,12 @@ document.querySelector('input[type=file]').addEventListener('change', (e) => {
 		document.querySelector('#index-selector').hidden = false;
 		canvas.width = images[0].width;
 		canvas.height = images[0].height;
-		document.querySelector('output').textContent = '';
-		for (let image of images) {
-			let img = document.createElement('img');
-			document.querySelector('output').appendChild(img);
-			canvas.getContext('2d').putImageData(image, 0, 0);
-			img.src = canvas.toDataURL();
-		}
-		changeImage({value: 0});
+		changeImage(0);
 		for (let input of document.querySelectorAll('#index-selector input')) {
 			input.max = images.length - 1;
-			input.addEventListener('input', (e) => changeImage(e.target));
+			input.addEventListener('input', (e) => changeImage(e.target.value));
 		}
+		document.querySelector('progress').hidden = true;
 	});
 });
 </script>
