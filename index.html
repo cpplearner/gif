@@ -75,9 +75,7 @@ function parseGIF(buffer) {
 				let value = (bytes >> (bit_index & 7)) & ((1 << LZW_code_size) - 1);
 				bit_index += LZW_code_size;
 				if (value === clear_code) {
-					table = new Array(clear_code + 2);
-					for (let j = 0; j < clear_code; ++j)
-						table[j] = [j];
+					table.length = clear_code + 2;
 					LZW_code_size = LZW_minimum_code_size + 1;
 				} else if (value === clear_code + 1)
 					break;
