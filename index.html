@@ -136,17 +136,25 @@ function parseGIF(buffer) {
 }
 let images = [];
 let canvas = document.querySelector('canvas');
-function changeImage(value) {
+function changeIndex(value) {
 	document.querySelector('input[type=range]').value = value;
 	document.querySelector('input[type=number]').value = value;
 	canvas.getContext('2d').putImageData(images[value], 0, 0);
 	document.querySelector('output img').src = canvas.toDataURL();
 }
+document.addEventListener('dragover', (e) => { e.preventDefault(); });
+document.addEventListener('drop', (e) => {
+	e.preventDefault();
+	changeFile(e.dataTransfer.files[0]);
+});
 document.querySelector('input[type=file]').addEventListener('change', (e) => {
+	changeFile(e.target.files[0]);
+});
+function changeFile(file) {
 	let t0 = performance.now();
 	document.querySelector('progress').hidden = false;
 	let reader = new FileReader();
-	reader.readAsArrayBuffer(e.target.files[0]);
+	reader.readAsArrayBuffer(file);
 	reader.addEventListener('loadend', () => {
 		let t1 = performance.now();
 		images = parseGIF(reader.result);
@@ -154,17 +162,17 @@ document.querySelector('input[type=file]').addEventListener('change', (e) => {
 		document.querySelector('#index-selector').hidden = false;
 		canvas.width = images[0].width;
 		canvas.height = images[0].height;
-		changeImage(0);
+		changeIndex(0);
 		let t3 = performance.now();
 		for (let input of document.querySelectorAll('#index-selector input')) {
 			input.max = images.length - 1;
-			input.addEventListener('input', (e) => changeImage(e.target.value));
+			input.addEventListener('input', (e) => changeIndex(e.target.value));
 		}
 		const benchmark = document.createElement('div');
-		benchmark.innerText = `read: ${t1 - t0}ms parse: ${t2 - t1}ms show: ${t3 - t2}ms\n`;
+		benchmark.textContent = `read: ${t1 - t0}ms parse: ${t2 - t1}ms show: ${t3 - t2}ms\n`;
 		benchmark.class = 'benchmark';
 		document.body.append(benchmark);
 		document.querySelector('progress').hidden = true;
 	});
-});
+}
 </script>
