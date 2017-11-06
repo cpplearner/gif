@@ -170,7 +170,7 @@ function changeFile(file) {
 		}
 		const benchmark = document.createElement('div');
 		benchmark.textContent = `read: ${t1 - t0}ms parse: ${t2 - t1}ms show: ${t3 - t2}ms\n`;
-		benchmark.class = 'benchmark';
+		benchmark.className = 'benchmark';
 		document.body.append(benchmark);
 		document.querySelector('progress').hidden = true;
 	});
