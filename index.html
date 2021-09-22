@@ -82,7 +82,9 @@ function parseGIF(buffer) {
 				else if (value <= table.length) {
 					if (last_value !== clear_code) {
 						const val = table[value === table.length ? last_value : value][0];
-						table.push(table[last_value].concat(val));
+						const temp = table[last_value].slice();
+						temp.push(val);
+						table.push(temp);
 					}
 					clip.set(table[value], clip_index);
 					clip_index += table[value].length;
