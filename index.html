@@ -64,15 +64,15 @@ function parseGIF(buffer) {
 			const clip = new Uint8ClampedArray(image_width * image_height);
 			let clip_index = 0;
 			let bit_index = 0;
-			let table = new Array(clear_code + 2);
+			const table = new Array(clear_code + 2);
 			for (let j = 0; j < clear_code; ++j)
 				table[j] = [j];
 			let last_value;
 			while (true) {
-				let byte_index = bit_index >> 3;
+				const byte_index = bit_index >> 3;
 				if (byte_index > data.length) return error();
-				let bytes = data[byte_index] | data[byte_index + 1] << 8 | data[byte_index + 2] << 16;
-				let value = (bytes >> (bit_index & 7)) & ((1 << LZW_code_size) - 1);
+				const bytes = data[byte_index] | data[byte_index + 1] << 8 | data[byte_index + 2] << 16;
+				const value = (bytes >> (bit_index & 7)) & ((1 << LZW_code_size) - 1);
 				bit_index += LZW_code_size;
 				if (value === clear_code) {
 					table.length = clear_code + 2;
@@ -137,12 +137,14 @@ function parseGIF(buffer) {
 	return images;
 }
 let images = [];
-let canvas = document.querySelector('canvas');
+const canvas = document.querySelector('canvas');
 function changeIndex(value) {
 	document.querySelector('input[type=range]').value = value;
 	document.querySelector('input[type=number]').value = value;
-	canvas.getContext('2d').putImageData(images[value], 0, 0);
-	document.querySelector('output img').src = canvas.toDataURL();
+	createImageBitmap(images[value]).then(bitmap => {
+		canvas.getContext('bitmaprenderer').transferFromImageBitmap(bitmap);
+		document.querySelector('output img').src = canvas.toDataURL();
+	});
 }
 document.addEventListener('dragover', (e) => { e.preventDefault(); });
 document.addEventListener('drop', (e) => {
@@ -153,20 +155,20 @@ document.querySelector('input[type=file]').addEventListener('change', (e) => {
 	changeFile(e.target.files[0]);
 });
 function changeFile(file) {
-	let t0 = performance.now();
+	const t0 = performance.now();
 	document.querySelector('progress').hidden = false;
-	let reader = new FileReader();
+	const reader = new FileReader();
 	reader.readAsArrayBuffer(file);
 	reader.addEventListener('loadend', () => {
-		let t1 = performance.now();
+		const t1 = performance.now();
 		images = parseGIF(reader.result);
-		let t2 = performance.now();
+		const t2 = performance.now();
 		document.querySelector('#index-selector').hidden = false;
 		canvas.width = images[0].width;
 		canvas.height = images[0].height;
 		changeIndex(0);
-		let t3 = performance.now();
-		for (let input of document.querySelectorAll('#index-selector input')) {
+		const t3 = performance.now();
+		for (const input of document.querySelectorAll('#index-selector input')) {
 			input.max = images.length - 1;
 			input.addEventListener('input', (e) => changeIndex(e.target.value));
 		}
