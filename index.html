@@ -154,29 +154,26 @@ document.addEventListener('drop', (e) => {
 document.querySelector('input[type=file]').addEventListener('change', (e) => {
 	changeFile(e.target.files[0]);
 });
-function changeFile(file) {
+async function changeFile(file) {
 	const t0 = performance.now();
 	document.querySelector('progress').hidden = false;
-	const reader = new FileReader();
-	reader.readAsArrayBuffer(file);
-	reader.addEventListener('loadend', () => {
-		const t1 = performance.now();
-		images = parseGIF(reader.result);
-		const t2 = performance.now();
-		document.querySelector('#index-selector').hidden = false;
-		canvas.width = images[0].width;
-		canvas.height = images[0].height;
-		changeIndex(0);
-		const t3 = performance.now();
-		for (const input of document.querySelectorAll('#index-selector input')) {
-			input.max = images.length - 1;
-			input.addEventListener('input', (e) => changeIndex(e.target.value));
-		}
-		const benchmark = document.createElement('div');
-		benchmark.textContent = `read: ${t1 - t0}ms parse: ${t2 - t1}ms show: ${t3 - t2}ms\n`;
-		benchmark.className = 'benchmark';
-		document.body.append(benchmark);
-		document.querySelector('progress').hidden = true;
-	});
+	const buffer = await file.arrayBuffer();
+	const t1 = performance.now();
+	images = parseGIF(buffer);
+	const t2 = performance.now();
+	document.querySelector('#index-selector').hidden = false;
+	canvas.width = images[0].width;
+	canvas.height = images[0].height;
+	changeIndex(0);
+	const t3 = performance.now();
+	for (const input of document.querySelectorAll('#index-selector input')) {
+		input.max = images.length - 1;
+		input.addEventListener('input', (e) => changeIndex(e.target.value));
+	}
+	const benchmark = document.createElement('div');
+	benchmark.textContent = `read: ${t1 - t0}ms parse: ${t2 - t1}ms show: ${t3 - t2}ms\n`;
+	benchmark.className = 'benchmark';
+	document.body.append(benchmark);
+	document.querySelector('progress').hidden = true;
 }
 </script>
